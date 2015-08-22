@@ -4,18 +4,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
-import json
+
 import logging
 import os
 import sys
+
 from rauth import OAuth1Session
+import requests
+import xmltodict
+
 
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
 
-from . import MissingCredentialsException
+from .exceptions import *
+from .querybuilder import *
 
 
 class QuickBooks(object):
@@ -74,49 +79,80 @@ class QuickBooks(object):
         self._create_session()
 
     def create(self, resource, resource_dict, params=None):
-        url = self._get_url(resource)
+        url = self._get_crud_url(resource)
         response = self._execute(method='post', url=url,
                                  params=params or {},
                                  json=resource_dict)
+
+        return response[resource]
 
     def read(self, resource, resource_id, params=None):
-        url = self._get_url(resource, resource_id)
+        url = self._get_crud_url(resource, resource_id)
         response = self._execute(method='get', url=url, params=params or {})
+        return response[resource]
 
     def update(self, resource, resource_dict, params=None):
-        url = self._get_url(resource)
+        url = self._get_crud_url(resource)
         response = self._execute(method='post', url=url,
                                  params=params or {},
                                  json=resource_dict)
+        return response[resource]
 
     def delete(self, resource, resource_dict, params=None):
-        url = self._get_url(resource)
+        url = self._get_crud_url(resource)
         params = params or {}
         params['operation'] = 'delete'
         response = self._execute(method='post', url=url,
                                  params=params,
                                  json=resource_dict)
 
+        return response[resource]
 
     def query(self, querybuilder, params=None):
-        pass
+        query = querybuilder.build()
+        entity = querybuilder.get_entity()
+        count = querybuilder.is_count_query()
+        return self._query(entity, query, count, params)
 
-    def batch_query(self, querybuilder, limit=100):
-        pass
+    def _query(self, entity, query, count=False, params=None):
+        params = params or {}
+
+        params['query'] = query
+
+        url = "/".join([self.base_url_v3, 'company', self.company_id, 'query'])
+
+        response = self._execute(method='get', url=url, params=params)
+
+        if count:
+            return response['QueryResponse']['totalCount']
+        else:
+            return QueryResponse(entity, response['QueryResponse'])
+
+    def batch_query(self, querybuilder, params=None):
+        params = params or {}
+        while True:
+            query_response = self.query(querybuilder, params)
+            total_count = query_response.total_count
+            startposition = query_response.startposition
+            maxresults = query_response.maxresults
+            yield query_response
+            if total_count < maxresults:
+                return
+            else:
+                querybuilder.offset(startposition + maxresults)
 
     def _execute(self, method, url, **kwargs):
         method = getattr(self.session, method)
         headers = {'Accept': 'application/json',
                    'Content-Type': 'application/json'}
+
         response = method(url, header_auth=True,
                           realm=self.company_id, headers=headers,
                           **kwargs)
 
-        print(response.status_code, response.text)
+        return ResponseParser(response).parse()
 
-        return response
-
-    def _get_url(self, resource, resource_id=None):
+    def _get_crud_url(self, resource, resource_id=None):
         urlparts = [self.base_url_v3, 'company', self.company_id,
                     resource.lower()]
 
@@ -124,7 +160,6 @@ class QuickBooks(object):
             urlparts.append(resource_id)
 
         return "/".join(urlparts)
-
 
     def _create_session(self):
         self.session = OAuth1Session(self.consumer_key,
@@ -168,4 +203,69 @@ class QuickBooks(object):
             raise MissingCredentialsException
 
 
+class ResponseParser(object):
+
+    HTTP_CODE_EXCEPTION_MAP = {
+        401: AuthenticationError,
+        403: PermissionDenied,
+        404: NotFoundError,
+        500: ServerError,
+        503: ServiceUnavailable
+    }
+
+    FAULT_TYPE_EXCEPTION_MAP = {
+        'AUTHENTICATION': AuthenticationError,
+        'AUTHORIZATION': PermissionDenied,
+        'VALIDATIONFAULT': ValidationFault,
+        'SERVICEFAULT': ServerError
+    }
+
+    def __init__(self, response):
+        super(ResponseParser, self).__init__()
+        self.response = response
+
+    def parse(self):
+        status_code = self.response.status_code
+        if status_code != requests.codes.ok:
+            self.response.parse_http_error()
+
+        elif self.is_xml_response():
+            self.parse_quickbooks_error()
+
+        else:
+            json_response = self.response.json()
+            if 'Fault' in json_response:
+                self.parse_quickbooks_error()
+            else:
+                return json_response
+
+    def parse_http_error(self, response):
+        status_code = response.status_code
+        if status_code in self.HTTP_CODE_EXCEPTION_MAP:
+            exception = self.HTTP_CODE_EXCEPTION_MAP[status_code]
+
+            raise exception(response.reason)
+
+        elif status_code == requests.codes.bad_request:
+            return self.parse_quickbooks_error()
+        else:
+            raise UnknownError(status_code, response.reason)
+
+    def parse_quickbooks_error(self):
+        if self.is_xml_response():
+            parsed_error = xmltodict.parse(self.response.json)
+            fault = parsed_error['IntuitResponse']['Fault']
+            fault_type = fault['@type'].upper()
+            for error in fault['Errors']:
+                error['code'] = error['@code']
+                del error['@code']
+
+        else:
+            fault = self.response.json()['Fault']
+            fault_type = fault['type'].upper()
+
+        raise self.FAULT_TYPE_EXCEPTION_MAP[fault_type](fault['Error'])
+
+    def is_xml_response(self):
+        return 'xml' in self.response.headers['content-type']
 

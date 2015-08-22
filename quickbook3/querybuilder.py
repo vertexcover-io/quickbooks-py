@@ -2,50 +2,42 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from .exceptions import InvalidQueryError
 
 
 class QueryBuilder(object):
     def __init__(self, entity):
         self.entity = entity
-
         self.columns = '*'
-
-        self.selectflag = False
-
         self.filterflag = False
         self.filters = []
         self.incomplete_filter_flag = False
+        self.countflag = False
 
         self.paginationflag = False
-        self.maxresult = 1000
+        self.maxresults = 100
         self.startposition = 1
 
-    def select(self, columns=None):
-        if self.selectflag:
-            raise InvalidQueryError("Multiple select clauses are not allowed")
+    def get_entity(self):
+        return self.entity
 
-        self.selectflag = True
-        if columns:
-            self.columns = columns.split(", ")
-
+    def select(self, columns):
+        if isinstance(columns, (tuple, list)):
+            self.columns = ", ".join(columns)
+        else:
+            self.columns = columns
         return self
 
-    def _validate(self, filter_op=True):
-        if not self.selectflag:
-            raise InvalidQueryError("Must be preceded by a select clause")
-
-        if not filter_op and self.incomplete_filter_flag:
-            raise InvalidQueryError("Incomplete Filter Clause - > %s" %
-                                    self.filters[-1])
+    def get_columns(self):
+        return self.columns if self.columns else '*'
 
     def where(self, column):
-        self._validate(filter_op=False)
+        self._validate()
         self.incomplete_filter_flag = True
         self.filters.append(column)
         return self
 
     def equals(self, value):
-        self._validate()
         if value is None:
             value = ''
 
@@ -60,7 +52,6 @@ class QueryBuilder(object):
         return self
 
     def contains(self, values):
-        self._validate()
         if not isinstance(values, (list, tuple)):
             raise InvalidQueryError("Contains operator must "
                                     "receive a list/tuple of values")
@@ -83,7 +74,6 @@ class QueryBuilder(object):
         return self._operator('<=', value)
 
     def _operator(self, op, value):
-        self._validate()
         try:
             float(value)
         except ValueError:
@@ -96,7 +86,6 @@ class QueryBuilder(object):
         return self
 
     def like(self, value):
-        self._validate()
         if not isinstance(value, basestring):
             raise InvalidQueryError("Like operator requires "
                                     "value be of type string")
@@ -106,25 +95,62 @@ class QueryBuilder(object):
         self.incomplete_filter_flag = False
         return self
 
+    def set_filters(self, where):
+        self.filters = where.split(' AND ')
+        self._validate()
+
+    def get_filters(self):
+        return self.filters
+
     def count(self):
-        self._validate(filter_op=False)
+        self._validate()
+        self.countflag = True
         self.columns = "count(*)"
         return self
 
+    def is_count_query(self):
+        return self.countflag
+
     def limit(self, maxresults):
-        self._validate(filter_op=False)
+        self._validate()
         self.paginationflag = True
-        self.maxresult = maxresults
+        self.maxresults = maxresults
         return self
 
+    def get_maxresults(self):
+        return self.maxresults
+
     def offset(self, startposition):
-        self._validate(filter_op=False)
+        self._validate()
         self.paginationflag = True
         self.startposition = startposition
         return self
 
+    def get_startposition(self):
+        return self.startposition
+    
+    
+    @classmethod
+    def from_parts(cls, entity, columns='*', where=None, count=False, 
+                   maxresults=100, startposition=0):
+        
+        qb = QueryBuilder(entity)
+        qb.select(columns)
+        qb.limit(maxresults)
+        qb.offset(startposition)
+        if count:
+            qb.count()
+
+        if where:
+            qb.set_filters(where)
+
+        return qb
+
     def build(self):
-        self._validate(filter_op=False)
+        self._validate()
+        if not self.columns:
+            self.columns = '*'
+
         query = "Select %s From %s" % (self.columns, self.entity)
 
         if self.filters:
@@ -132,7 +158,27 @@ class QueryBuilder(object):
 
         if self.paginationflag:
             query += ' StartPosition %d MaxResults %d' % (self.startposition,
-                                                          self.maxresult)
+                                                          self.maxresults)
 
         return query
+
+    def _validate(self):
+        if self.incomplete_filter_flag:
+            raise InvalidQueryError("Incomplete Filter Clause - > %s" %
+                                    self.filters[-1])
+
+
+class QueryResponse(object):
+
+    def __init__(self, entity, query_response):
+        self.entity = entity
+        self.object_list = query_response[entity]
+        self.total_count = query_response['totalCount']
+        self.startposition = query_response['startPosition']
+        self.maxresults = query_response['maxResults']
+
+    def __repr__(self):
+        return "Entity: %s, StartPosition: %d, Count: %d, " \
+               "MaxResults: %d" % (self.entity, self.startposition,
+                                   self.total_count, self.maxresults)
 
