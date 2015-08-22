@@ -141,6 +141,16 @@ class QuickBooks(object):
             else:
                 querybuilder.offset(startposition + maxresults)
 
+    def report(self, name, params=None):
+        params = params or {}
+
+        url = "/".join([self.base_url_v3, 'company', self.company_id,
+                        'reports', name])
+
+        response = self._execute(method='get', url=url, params=params)
+
+        return response
+
     def _execute(self, method, url, **kwargs):
         method = getattr(self.session, method)
         headers = {'Accept': 'application/json',
