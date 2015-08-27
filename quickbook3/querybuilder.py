@@ -173,9 +173,9 @@ class QueryResponse(object):
     def __init__(self, entity, query_response):
         self.entity = entity
         self.object_list = query_response[entity]
-        self.total_count = query_response['totalCount']
         self.startposition = query_response['startPosition']
         self.maxresults = query_response['maxResults']
+        self.total_count = query_response.get('totalCount', self.maxresults)
 
     def __repr__(self):
         return "Entity: %s, StartPosition: %d, Count: %d, " \
