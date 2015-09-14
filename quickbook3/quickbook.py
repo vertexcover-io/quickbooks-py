@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 
+"""
+    A quickbooks client to access various quickbooks endpointz.
+"""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -51,6 +55,38 @@ class QuickBooks(object):
                  logger=None, peform_logging=False,
                  log_level=logging.ERROR):
 
+        """
+        :param company_id: This is the realmID obtained during authorization
+        :type company_id: str
+        :param consumer_key: Client consumer key, required for signing,
+                             defaults to `None`.
+        :type consumer_key: str
+        :param consumer_secret: Client consumer secret, required for signing.
+                                defaults to `None`.
+        :type consumer_secret: str
+        :param access_token: Access token, defaults to `None`.
+        :type access_token: str
+        :param access_token_secret: Access token secret, defaults to `None`.
+        :type access_token_secret: str
+        :param cred_file: Path to the credential file to read the consumer and
+                          access token pair, defaults to `None`.
+
+        :param sandbox_mode: A flag indicating whether to use production
+            endpoints or sandbox endpoints, , defaults to `False`.
+        :type sandbox_mode: bool
+        :param logger: A logger to be used to log messages, error and debugging
+            information
+        :type logger: :class:`logging`
+
+        :param peform_logging: A flag indicating whether to perform Logging,
+            defaults to `True`.
+        :type peform_logging: bool
+
+        :param log_level: Mininum Log Level to log
+        :type log_level: int
+        :return:
+        """
+
         self.sandbox_mode = sandbox_mode
 
         self.base_url_v3 = self.sandbox_url if self.sandbox_mode \
@@ -78,7 +114,7 @@ class QuickBooks(object):
 
         self._create_session()
 
-    def create(self, resource, resource_dict, params=None):
+    def create(self, resource, resource_dict, **params):
         url = self._get_crud_url(resource)
         response = self._execute(method='post', url=url,
                                  params=params or {},
@@ -86,19 +122,19 @@ class QuickBooks(object):
 
         return response[resource]
 
-    def read(self, resource, resource_id, params=None):
+    def read(self, resource, resource_id, **params):
         url = self._get_crud_url(resource, resource_id)
         response = self._execute(method='get', url=url, params=params or {})
         return response[resource]
 
-    def update(self, resource, resource_dict, params=None):
+    def update(self, resource, resource_dict, **params):
         url = self._get_crud_url(resource)
         response = self._execute(method='post', url=url,
                                  params=params or {},
                                  json=resource_dict)
         return response[resource]
 
-    def delete(self, resource, resource_dict, params=None):
+    def delete(self, resource, resource_dict, **params):
         url = self._get_crud_url(resource)
         params = params or {}
         params['operation'] = 'delete'
@@ -108,7 +144,7 @@ class QuickBooks(object):
 
         return response[resource]
 
-    def query(self, querybuilder, params=None):
+    def query(self, querybuilder, **params):
         query = querybuilder.build()
         entity = querybuilder.get_entity()
         count = querybuilder.is_count_query()
@@ -128,20 +164,20 @@ class QuickBooks(object):
         else:
             return QueryResponse(entity, response['QueryResponse'])
 
-    def batch_query(self, querybuilder, params=None):
+    def batch_query(self, querybuilder, **params):
         params = params or {}
+        maxresults = querybuilder.get_maxresults()
         while True:
-            query_response = self.query(querybuilder, params)
+            query_response = self.query(querybuilder, **params)
             total_count = query_response.total_count
             startposition = query_response.startposition
-            maxresults = query_response.maxresults
             yield query_response
             if total_count < maxresults:
                 return
             else:
                 querybuilder.offset(startposition + maxresults)
 
-    def report(self, name, params=None):
+    def report(self, name, **params):
         params = params or {}
 
         url = "/".join([self.base_url_v3, 'company', self.company_id,
