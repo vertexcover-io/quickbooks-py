@@ -12,10 +12,11 @@ from __future__ import unicode_literals
 import logging
 import os
 import sys
+import datetime
 
 from rauth import OAuth1Session
-import requests
-import xmltodict
+
+from quickbook3.response import ResponseParser, QueryResponse, CDCResponse
 
 
 try:
@@ -187,6 +188,21 @@ class QuickBooks(object):
 
         return response
 
+    def cdc(self, entities, changed_since):
+        if isinstance(changed_since, datetime.datetime):
+            changed_since = changed_since.isoformat()
+
+        params = {
+            'entities': ','.join(entities),
+            'changedSince': changed_since
+        }
+
+        url = "/".join([self.base_url_v3, 'company', self.company_id, 'cdc'])
+
+        response = self._execute(method='get', url=url, params=params)
+
+        return CDCResponse(entities, response['CDCResponse'])
+
     def _execute(self, method, url, **kwargs):
         method = getattr(self.session, method)
         headers = {'Accept': 'application/json',
@@ -248,70 +264,4 @@ class QuickBooks(object):
         except configparser.NoOptionError:
             raise MissingCredentialsException
 
-
-class ResponseParser(object):
-
-    HTTP_CODE_EXCEPTION_MAP = {
-        401: AuthenticationError,
-        403: PermissionDenied,
-        404: NotFoundError,
-        500: ServerError,
-        503: ServiceUnavailable
-    }
-
-    FAULT_TYPE_EXCEPTION_MAP = {
-        'AUTHENTICATION': AuthenticationError,
-        'AUTHORIZATION': PermissionDenied,
-        'VALIDATIONFAULT': ValidationFault,
-        'SERVICEFAULT': ServerError
-    }
-
-    def __init__(self, response):
-        super(ResponseParser, self).__init__()
-        self.response = response
-
-    def parse(self):
-        status_code = self.response.status_code
-        if status_code != requests.codes.ok:
-            self.response.parse_http_error()
-
-        elif self.is_xml_response():
-            self.parse_quickbooks_error()
-
-        else:
-            json_response = self.response.json()
-            if 'Fault' in json_response:
-                self.parse_quickbooks_error()
-            else:
-                return json_response
-
-    def parse_http_error(self, response):
-        status_code = response.status_code
-        if status_code in self.HTTP_CODE_EXCEPTION_MAP:
-            exception = self.HTTP_CODE_EXCEPTION_MAP[status_code]
-
-            raise exception(response.reason)
-
-        elif status_code == requests.codes.bad_request:
-            return self.parse_quickbooks_error()
-        else:
-            raise UnknownError(status_code, response.reason)
-
-    def parse_quickbooks_error(self):
-        if self.is_xml_response():
-            parsed_error = xmltodict.parse(self.response.json)
-            fault = parsed_error['IntuitResponse']['Fault']
-            fault_type = fault['@type'].upper()
-            for error in fault['Errors']:
-                error['code'] = error['@code']
-                del error['@code']
-
-        else:
-            fault = self.response.json()['Fault']
-            fault_type = fault['type'].upper()
-
-        raise self.FAULT_TYPE_EXCEPTION_MAP[fault_type](fault['Error'])
-
-    def is_xml_response(self):
-        return 'xml' in self.response.headers['content-type']
 
