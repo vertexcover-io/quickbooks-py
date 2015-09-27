@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
-from .exceptions import *
-from .auth import *
-from .querybuilder import *
-from .quickbook import *
+__author__ = 'Ritesh Kadmawala'
+__email__ = 'ritesh@loanzen.in'
+__version__ = '0.0.3'
