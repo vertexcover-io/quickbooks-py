@@ -2,9 +2,10 @@
 
 from __future__ import absolute_import
 from __future__ import division
-from collections import defaultdict
+
 import requests
 import xmltodict
+
 from quickbook3 import AuthenticationError, PermissionDenied, NotFoundError, \
     ServerError, ServiceUnavailable, ValidationFault, UnknownError
 

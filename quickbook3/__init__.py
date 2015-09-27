@@ -2,4 +2,10 @@
 
 __author__ = 'Ritesh Kadmawala'
 __email__ = 'ritesh@loanzen.in'
-__version__ = '0.0.3'
+__version__ = '0.1.1'
+
+from quickbook import *
+from querybuilder import *
+from auth import *
+from exceptions import *
+from response import *
