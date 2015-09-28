@@ -16,7 +16,7 @@ import datetime
 
 from rauth import OAuth1Session
 
-from quickbook3.response import ResponseParser, QueryResponse, CDCResponse
+from .response import ResponseParser, QueryResponse, CDCResponse
 
 
 try:

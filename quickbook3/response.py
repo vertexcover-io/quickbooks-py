@@ -6,7 +6,7 @@ from __future__ import division
 import requests
 import xmltodict
 
-from quickbook3 import AuthenticationError, PermissionDenied, NotFoundError, \
+from .exceptions import AuthenticationError, PermissionDenied, NotFoundError, \
     ServerError, ServiceUnavailable, ValidationFault, UnknownError
 
 
