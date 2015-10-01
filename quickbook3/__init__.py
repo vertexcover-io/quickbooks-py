@@ -2,7 +2,7 @@
 
 __author__ = 'Ritesh Kadmawala'
 __email__ = 'ritesh@loanzen.in'
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 from quickbook import *
 from querybuilder import *

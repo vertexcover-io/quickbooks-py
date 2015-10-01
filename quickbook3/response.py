@@ -52,12 +52,12 @@ class ResponseParser(object):
         if status_code in self.HTTP_CODE_EXCEPTION_MAP:
             exception = self.HTTP_CODE_EXCEPTION_MAP[status_code]
 
-            raise exception(response.reason)
+            raise exception(self.response.reason)
 
         elif status_code == requests.codes.bad_request:
             return self.parse_quickbooks_error()
         else:
-            raise UnknownError(status_code, response.reason)
+            raise UnknownError(status_code, self.response.reason)
 
     def parse_quickbooks_error(self):
         if self.is_xml_response():
