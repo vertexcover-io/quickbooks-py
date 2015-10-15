@@ -7,3 +7,7 @@ History
 ---------------------
 
 * First release on PyPI.
+
+0.1.4 (2015-10-15)
+
+* Updated requests library
