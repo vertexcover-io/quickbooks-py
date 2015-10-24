@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 import datetime
+import traceback
 
 from rauth import OAuth1Session
 
@@ -25,7 +26,17 @@ except ImportError:
     import ConfigParser as configparser
 
 from .exceptions import *
-from .querybuilder import *
+
+
+def auth_required(func):
+    def wrapper(self, *args, **kwargs):
+        if all([self.consumer_key, self.consumer_secret,
+                self.access_token, self.access_token_secret]):
+            return func(self, *args, **kwargs)
+        else:
+            raise MissingCredentialsException()
+
+    return wrapper
 
 
 class QuickBooks(object):
@@ -33,17 +44,13 @@ class QuickBooks(object):
 
     sandbox_url = "https://sandbox-quickbooks.api.intuit.com/v3"
 
-    ACCOUNTING_SERVICES = [
-        "Account", "Attachable", "Bill", "BillPayment",
-        "Class", "CompanyInfo", "CreditMemo", "Customer",
-        "Department",
-        "Deposit",
-        "Employee", "Estimate", "Invoice",
-        "Item", "JournalEntry", "Payment", "PaymentMethod",
-        "Preferences", "Purchase", "PurchaseOrder",
-        "SalesReceipt", "TaxCode", "TaxRate", "Term",
-        "TimeActivity", "Vendor", "VendorCredit"
-    ]
+    ACCOUNTING_SERVICES = ['account', 'attachable', 'bill', 'billpayment',
+                           'class', 'companyinfo', 'creditmemo', 'customer',
+                           'department', 'deposit', 'employee', 'estimate',
+                           'invoice', 'item', 'journalentry', 'payment',
+                           'paymentmethod', 'preferences', 'purchase',
+                           'purchaseorder', 'salesreceipt', 'taxcode', 'taxrate',
+                           'term', 'timeactivity', 'vendor', 'vendorcredit']
 
     CONSUMER_KEY_NAME = 'QB_CONSUMER_KEY'
     CONSUMER_SECRET_NAME = 'QB_CONSUMER_SECRET'
@@ -95,12 +102,8 @@ class QuickBooks(object):
 
         self.company_id = company_id
 
-        if cred_file:
-            self._read_creds_from_file(cred_file)
-
-        else:
-            self._get_credentials(consumer_key, consumer_secret,
-                                  access_token, access_token_secret)
+        self.set_credentials(cred_file, consumer_key, consumer_secret,
+                             access_token, access_token_secret)
 
         self.peform_logging = peform_logging
 
@@ -203,6 +206,7 @@ class QuickBooks(object):
 
         return CDCResponse(entities, response['CDCResponse'])
 
+    @auth_required
     def _execute(self, method, url, **kwargs):
         method = getattr(self.session, method)
         headers = {'Accept': 'application/json',
@@ -210,11 +214,13 @@ class QuickBooks(object):
 
         response = method(url, header_auth=True,
                           realm=self.company_id, headers=headers,
-                          **kwargs)
-
+                          verify=False, **kwargs)
         return ResponseParser(response).parse()
 
     def _get_crud_url(self, resource, resource_id=None):
+        if not resource in self.ACCOUNTING_SERVICES:
+            raise InvalidResourceError
+
         urlparts = [self.base_url_v3, 'company', self.company_id,
                     resource.lower()]
 
@@ -229,25 +235,28 @@ class QuickBooks(object):
                                      self.access_token,
                                      self.access_token_secret)
 
-    def _get_credentials(self, consumer_key, consumer_secret, access_token,
-                         access_token_secret):
+    def set_credentials(self, cred_file, consumer_key, consumer_secret,
+                        access_token, access_token_secret):
 
-        try:
-            self.consumer_key = consumer_key or \
-                                os.environ[self.CONSUMER_KEY_NAME]
-            self.consumer_secret = consumer_secret or \
-                                   os.environ[self.CONSUMER_SECRET_NAME]
+        if cred_file:
+            self._read_creds_from_file(cred_file)
+        else:
+            try:
+                self.consumer_key = consumer_key or os.environ[
+                    self.CONSUMER_KEY_NAME]
+                self.consumer_secret = consumer_secret or os.environ[
+                    self.CONSUMER_SECRET_NAME]
 
-            self.access_token = access_token or \
-                                os.environ[self.ACCESS_TOKEN_NAME]
-            self.access_token_secret = access_token_secret or \
-                                       os.environ[self.ACCESS_TOKEN_SECRET_NAME]
+                self.access_token = access_token or os.environ[
+                    self.ACCESS_TOKEN_NAME]
+                self.access_token_secret = access_token_secret or os.environ[
+                    self.ACCESS_TOKEN_SECRET_NAME]
 
-        except KeyError:
-            raise MissingCredentialsException
+            except KeyError:
+                raise MissingCredentialsException
 
     def _read_creds_from_file(self, filename):
-        config = configparser.ConfigParser()
+        config = configparser.RawConfigParser()
         config.read(filename)
 
         try:
@@ -261,7 +270,7 @@ class QuickBooks(object):
             self.access_token_secret = config.get('credentials',
                                                   self.ACCESS_TOKEN_SECRET_NAME)
 
-        except configparser.NoOptionError:
+        except configparser.NoOptionError, configparser.NoSectionError:
             raise MissingCredentialsException
 
 

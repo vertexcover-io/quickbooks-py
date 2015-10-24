@@ -25,6 +25,13 @@ class MissingCredentialsException(QuickBooksError):
                       "access token and access secret must be passed")
 
 
+class InvalidResourceError(QuickBooksError):
+    """
+    Raised if an invalid resource is requested
+    """
+    pass
+
+
 class InvalidQueryError(QuickBooksError):
     """
     Raised while constructing an invalid query using the querybuilder
