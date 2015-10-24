@@ -1,0 +1,4 @@
+[credentials]
+QB_CONSUMER_KEY=consumer_key
+QB_ACCESS_TOKEN=access_token
+QB_ACCESS_TOKEN_SECRET=access_secret
