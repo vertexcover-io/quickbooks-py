@@ -113,7 +113,7 @@ class GenericError(HttpQuickBookError):
         for error in self.errors:
             error_message += ' %s.' % error['Detail']
 
-        super(HttpQuickBookError, self).__init__(error_message)
+        super(GenericError, self).__init__(error_message)
 
 
 class ValidationFault(GenericError):
@@ -128,3 +128,11 @@ class ServiceError(GenericError):
     A non-recoverable error. Something failed on the server
     """
     pass
+
+
+class DisconnectionError(HttpQuickBookError):
+
+    def __init__(self, error_code, error_message):
+        self.error_code = error_code
+        self.error_message = error_message
+        super(DisconnectionError, self).__init__(error_message)

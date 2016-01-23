@@ -44,6 +44,8 @@ class QuickBooks(object):
 
     sandbox_url = "https://sandbox-quickbooks.api.intuit.com/v3"
 
+    disconnect_url = "https://appcenter.intuit.com/api/v1/connection/disconnect"
+
     ACCOUNTING_SERVICES = ['account', 'attachable', 'bill', 'billpayment',
                            'class', 'companyinfo', 'creditmemo', 'customer',
                            'department', 'deposit', 'employee', 'estimate',
@@ -205,6 +207,13 @@ class QuickBooks(object):
         response = self._execute(method='get', url=url, params=params)
 
         return CDCResponse(entities, response['CDCResponse'])
+
+    def disconnect(self):
+        resp = self._execute(method='get', url=self.disconnect_url)
+        if resp['ErrorCode'] > 0:
+            raise DisconnectionError(resp['ErrorCode'], resp['ErrorMessage'])
+        
+
 
     @auth_required
     def _execute(self, method, url, **kwargs):
