@@ -15,3 +15,7 @@ History
 0.2.0 (2016-01-23)
 
 * Added an api to disconnect from quickbooks
+
+0.2.1 (2016-01-23)
+
+* Making Resource name case insensitive

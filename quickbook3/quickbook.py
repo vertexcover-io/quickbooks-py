@@ -212,7 +212,7 @@ class QuickBooks(object):
         resp = self._execute(method='get', url=self.disconnect_url)
         if resp['ErrorCode'] > 0:
             raise DisconnectionError(resp['ErrorCode'], resp['ErrorMessage'])
-        
+
 
 
     @auth_required
@@ -227,11 +227,12 @@ class QuickBooks(object):
         return ResponseParser(response).parse()
 
     def _get_crud_url(self, resource, resource_id=None):
+        resource = resource.lower()
         if not resource in self.ACCOUNTING_SERVICES:
             raise InvalidResourceError
 
         urlparts = [self.base_url_v3, 'company', self.company_id,
-                    resource.lower()]
+                    resource]
 
         if resource_id:
             urlparts.append(resource_id)

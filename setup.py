@@ -19,7 +19,7 @@ with open('requirements.txt') as reqfile:
 
 setup(
     name='quickbooks-py',
-    version='0.2.0',
+    version='0.2.1',
     description="QuickBooks Python Client is a python library for quickbooks api version 3",
     long_description=readme + '\n\n' + history,
     author="Ritesh Kadmawala",
