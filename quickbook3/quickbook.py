@@ -178,7 +178,7 @@ class QuickBooks(object):
             total_count = query_response.total_count
             startposition = query_response.startposition
             yield query_response
-            if total_count < maxresults:
+            if total_count == 0 or total_count < maxresults:
                 return
             else:
                 querybuilder.offset(startposition + maxresults)

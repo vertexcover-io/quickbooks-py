@@ -84,7 +84,7 @@ class QueryResponse(object):
         self.entity = entity
         self.object_list = query_response.get(entity, [])
         self.startposition = query_response.get('startPosition', 1)
-        self.maxresults = query_response['maxResults']
+        self.maxresults = query_response.get('maxResults', 0)
         self.total_count = query_response.get('totalCount', self.maxresults)
 
     def __repr__(self):
@@ -113,7 +113,7 @@ class CDCResponse(object):
                     self.delete[entity].append(obj)
                     
     def __repr__(self):
-        upsert = "Upsert: %s"  % \
+        upsert = "Upsert: %s" % \
                  (str({entity: len(self.upsert[entity])
                        for entity in self.upsert.keys()}))
         
