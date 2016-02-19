@@ -38,6 +38,7 @@ class QueryBuilder(object):
         return self
 
     def equals(self, value):
+        self._validate_lhs()
         if value is None:
             value = ''
 
@@ -52,14 +53,12 @@ class QueryBuilder(object):
         return self
 
     def contains(self, values):
+        self._validate_lhs()
         if not isinstance(values, (list, tuple)):
             raise InvalidQueryError("Contains operator must "
                                     "receive a list/tuple of values")
 
-        column = self.filters[-1]
-        self.filters[-1] = "%s in %s" % (column, values)
-        self.incomplete_filter_flag = False
-        return self
+        self._complete_where('in', str(values))
 
     def gt(self, value):
         return self._operator('>', value)
@@ -74,24 +73,24 @@ class QueryBuilder(object):
         return self._operator('<=', value)
 
     def _operator(self, op, value):
+        self._validate_lhs()
         try:
             float(value)
         except ValueError:
             raise InvalidQueryError("%s operator requires "
                                     "value of type integer/float" % op)
-
-        column = self.filters[-1]
-        self.filters[-1] = "%s %s '%s'" % (column, op, value)
-        self.incomplete_filter_flag = False
-        return self
+        return self._complete_where(op, value)
 
     def like(self, value):
+        self._validate_lhs()
         if not isinstance(value, basestring):
             raise InvalidQueryError("Like operator requires "
                                     "value be of type string")
+        self._complete_where('Like', value)
 
+    def _complete_where(self, op, rhs):
         column = self.filters[-1]
-        self.filters[-1] = "%s Like '%s'" % (column, value)
+        self.filters[-1] = "%s %s '%s'" % (column, op, rhs)
         self.incomplete_filter_flag = False
         return self
 
@@ -167,4 +166,6 @@ class QueryBuilder(object):
             raise InvalidQueryError("Incomplete Filter Clause - > %s" %
                                     self.filters[-1])
 
-
+    def _validate_lhs(self):
+        if not self.incomplete_filter_flag:
+            raise InvalidQueryError("Operator clause must be preceeded by where clause")
