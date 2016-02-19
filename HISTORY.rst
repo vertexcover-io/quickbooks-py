@@ -19,3 +19,7 @@ History
 0.2.1 (2016-01-23)
 
 * Making Resource name case insensitive
+
+0.2.2 (2016-02-19)
+
+* Bugfix in parsing query response when the response is empty
